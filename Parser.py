@@ -6,13 +6,19 @@ from quickNastran import quickNastran
 @dataclass
 class Parser:
     file : str = ""
+    linesNotSupported = []
+    newLine : str = ""
 
     def parse(self):
         beginBulk=False
 
         with open(self.file, 'r') as bulk:
             for lines in bulk:
-                line=lines.strip()
+                if(self.newLine != ""):
+                    line=self.newLine.rstrip()
+                    self.newLine=""
+                else:
+                    line=lines.rstrip()
                 
                 if(self.isBeginBulk(line)):
                     beginBulk=True
@@ -22,6 +28,7 @@ class Parser:
                     nastranCard = quickNastran(cardName=cardName)
                     
                     if(self.isEmptyLine(line) or self.isCommentLine(line)):
+                        #TODO : Check if a line can start with space if it is not a multipleLine of a card
                         pass
                     
                     elif(cardName==keyWords._INCLUDE.value):
@@ -29,13 +36,32 @@ class Parser:
                     
                     elif(nastranCard.isNastranCard() and nastranCard.isSupported()):
                         print(line)
+                        cardObject=getattr(nastranCard,  cardName)
+                        print(cardObject)
+                        if(cardObject.multipleLine):
+                            #Parse the first line
+                            cardObject.parse(line)
+                            #Parse the multiple lines
+                            i=0
+                            while(i < cardObject.maxLine):
+                                i+=1
+                                nextLine=next(bulk, '')
+                                if(nextLine.startswith(' ')):
+                                    cardObject.parse(line)
+                                    print(nextLine.rstrip())
+                                else:
+                                    self.newLine=nextLine
+                        else :
+                            #TODO : Parser the cardObject
+                            cardObject.parse(line)
+                            pass
                     
                     else:
-                        print(f'{line} : It is a wrong line')
+                        self.linesNotSupported.append(line + '/n')
     
     def isEmptyLine(self, line):
         '''
-        Method to check il a line is empty or not
+        Method to check if a line is empty or not
         '''
         if(len(line.strip())==0):
             return True
